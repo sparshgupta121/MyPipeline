@@ -12,7 +12,7 @@ export class LambdaStack extends cdk.Stack {
       handler: 'index.handler',
       code: lambda.Code.fromInline(`
         exports.handler = async () => {
-          return "Hello, World";
+          return "Hello, Team";
         };
       `),
     });
