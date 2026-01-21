@@ -18,7 +18,7 @@ export class ProdPipelineStack extends cdk.Stack {
         // ✅ REQUIRED SOURCE (does NOT auto-trigger)
         input: CodePipelineSource.connection(
           'sparshgupta121/MyPipeline',
-          'main',
+          'temp',
           {
             connectionArn:
               'arn:aws:codeconnections:us-east-1:836688626238:connection/7bef095f-cc78-4584-b015-2dd4ce931a2e',
