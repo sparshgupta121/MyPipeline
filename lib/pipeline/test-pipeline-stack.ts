@@ -10,17 +10,18 @@ import {
 import { PipelineStage } from './pipeline-stage';
 
 export class TestPipelineStack extends cdk.Stack {
+  public static readonly PIPELINE_NAME = 'test-pipeline';
+
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
     const pipeline = new CodePipeline(this, 'TestPipeline', {
-      pipelineName: 'test-pipeline',
+      pipelineName: TestPipelineStack.PIPELINE_NAME,
       synth: new ShellStep('Synth', {
         input: CodePipelineSource.connection(
           'sparshgupta121/MyPipeline',
-          'main', // when main changes, Test pipeline runs
+          'main',
           {
-            // ⛳ Replace with your CodeStar Connections ARN
             connectionArn:
               'arn:aws:codeconnections:us-east-1:836688626238:connection/7bef095f-cc78-4584-b015-2dd4ce931a2e',
           }
@@ -29,7 +30,6 @@ export class TestPipelineStack extends cdk.Stack {
       }),
     });
 
-    // App infra goes to Test
     const testStage = pipeline.addStage(
       new PipelineStage(this, 'TestStage', {
         env: {
@@ -39,7 +39,7 @@ export class TestPipelineStack extends cdk.Stack {
       })
     );
 
-    // Human approval before promoting to Prod
+    // ✅ This approval controls PROD
     testStage.addPost(new ManualApprovalStep('ApproveProdDeploy'));
   }
 }
