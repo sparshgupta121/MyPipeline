@@ -1,20 +1,21 @@
-#!/usr/bin/env node
-import * as cdk from 'aws-cdk-lib/core';
-import { AppStack } from '../lib/app-stack';
+
+import * as cdk from 'aws-cdk-lib';
+import { TestPipelineStack } from '../lib/pipeline/test-pipeline-stack';
+import { ProdPipelineStack } from '../lib/pipeline/prod-pipeline-stack';
+import { TriggerProdLambdaStack } from '../lib/trigger/trigger-prod-lambda-stack';
 
 const app = new cdk.App();
-new AppStack(app, 'AppStack', {
-  /* If you don't specify 'env', this stack will be environment-agnostic.
-   * Account/Region-dependent features and context lookups will not work,
-   * but a single synthesized template can be deployed anywhere. */
 
-  /* Uncomment the next line to specialize this stack for the AWS Account
-   * and Region that are implied by the current CLI configuration. */
-  // env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
+// Use CDK_DEFAULT_* for easy local + CI/CD usage
+const env = {
+  account: process.env.CDK_DEFAULT_ACCOUNT,
+  region: process.env.CDK_DEFAULT_REGION,
+};
 
-  /* Uncomment the next line if you know exactly what Account and Region you
-   * want to deploy the stack to. */
-  // env: { account: '123456789012', region: 'us-east-1' },
+// If you already know the exact account/region, you can hardcode:
+// const env = { account: '111111111111', region: 'us-east-1' };
 
-  /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
-});
+new ProdPipelineStack(app, 'ProdPipelineStack', { env });
+new TriggerProdLambdaStack(app, 'TriggerProdLambdaStack', { env });
+new TestPipelineStack(app, 'TestPipelineStack', { env });
+
