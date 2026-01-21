@@ -4,7 +4,7 @@ import { Construct } from 'constructs';
 import {
   CodePipeline,
   ShellStep,
-  CodePipelineSource,   // ✅ ADD THIS
+  CodePipelineSource,
 } from 'aws-cdk-lib/pipelines';
 import { PipelineStage } from './pipeline-stage';
 
@@ -15,13 +15,14 @@ export class ProdPipelineStack extends cdk.Stack {
     const pipeline = new CodePipeline(this, 'ProdPipeline', {
       pipelineName: 'prod-pipeline',
       synth: new ShellStep('Synth', {
-        // ✅ REQUIRED SOURCE (does NOT auto-trigger)
+        // ✅ Provide code for synth BUT DO NOT auto-trigger on push
         input: CodePipelineSource.connection(
           'sparshgupta121/MyPipeline',
-          'temp',
+          'main',
           {
             connectionArn:
               'arn:aws:codeconnections:us-east-1:836688626238:connection/7bef095f-cc78-4584-b015-2dd4ce931a2e',
+            triggerOnPush: false, // 🔒 critical: prevents Prod auto-runs
           }
         ),
         commands: ['npm ci', 'npm run build', 'npx cdk synth'],
@@ -38,3 +39,4 @@ export class ProdPipelineStack extends cdk.Stack {
     );
   }
 }
+``
