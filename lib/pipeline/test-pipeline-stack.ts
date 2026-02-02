@@ -1,4 +1,3 @@
-
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import {
@@ -20,10 +19,11 @@ export class TestPipelineStack extends cdk.Stack {
       synth: new ShellStep('Synth', {
         input: CodePipelineSource.connection(
           'sparshgupta121/MyPipeline',
-          'main',
+          'test', // 👈 ONLY runs on test branch
           {
             connectionArn:
               'arn:aws:codeconnections:us-east-1:836688626238:connection/7bef095f-cc78-4584-b015-2dd4ce931a2e',
+            triggerOnPush: true, // 👈 YES, trigger automatically for test branch
           }
         ),
         commands: ['npm ci', 'npm run build', 'npx cdk synth'],
@@ -39,7 +39,7 @@ export class TestPipelineStack extends cdk.Stack {
       })
     );
 
-    // ✅ This approval controls PROD
+    // 👇 Approval prompt stays *only* in test pipeline
     testStage.addPost(new ManualApprovalStep('ApproveProdDeploy'));
   }
 }
