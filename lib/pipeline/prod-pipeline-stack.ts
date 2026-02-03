@@ -61,11 +61,12 @@ export class ProdPipelineStack extends cdk.Stack {
           // Install CDK CLI locally so `npx cdk` is reliable in CodeBuild
           'npm install --no-save aws-cdk@2',
 
-          // 🔒 Pin ESLint v8 to avoid v9 flat-config requirement
+          // 🔒 Pin ESLint v8 & compatible parser/plugin
           'npm install --no-save -D eslint@8.57.0 eslint-plugin-security@1.7.1 @typescript-eslint/parser@6.21.0',
 
-          // Write a minimal .eslintrc.cjs for ESLint v8
+          // ESLint config & ignore
           'printf \'module.exports = { parser: "@typescript-eslint/parser", plugins: ["security"], extends: ["eslint:recommended", "plugin:security/recommended"], env: { node: true, es2021: true }, parserOptions: { ecmaVersion: 2021, sourceType: "module" } };\' > .eslintrc.cjs',
+          'printf "node_modules\\ncdk.out\\ndist\\n" > .eslintignore',
 
           // Trivy (binary)
           'curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b .',
@@ -89,7 +90,6 @@ export class ProdPipelineStack extends cdk.Stack {
           // --- SCA ---
           'echo "Running npm audit (SCA)..."',
           'npm audit --json > reports/npm-audit.json || true',
-          // Fail only on High/Critical
           'node -e \'const r=require("./reports/npm-audit.json"); const a=(r.vulnerabilities||r.metadata?.vulnerabilities)||{}; const high=(a.high||0)+(a.HIGH||0); const critical=(a.critical||0)+(a.CRITICAL||0); if (high+critical>0){console.error("High/Critical vulns:",{high,critical}); process.exit(1);} else {console.log("npm audit: no High/Critical");}\'',
 
           // Build & synth
