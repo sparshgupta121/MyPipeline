@@ -2,6 +2,7 @@ import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as codebuild from 'aws-cdk-lib/aws-codebuild';
 import {
   CodePipeline,
   CodePipelineSource,
@@ -62,11 +63,12 @@ export class TestPipelineStack extends cdk.Stack {
           // Install CDK CLI locally so `npx cdk` is reliable in CodeBuild
           'npm install --no-save aws-cdk@2',
 
-          // 🔒 Pin ESLint v8 to avoid v9 flat-config requirement
+          // 🔒 Pin ESLint v8 & compatible parser/plugin to avoid ESLint v9 flat-config requirement
           'npm install --no-save -D eslint@8.57.0 eslint-plugin-security@1.7.1 @typescript-eslint/parser@6.21.0',
 
-          // Write a minimal .eslintrc.cjs for ESLint v8
+          // Minimal ESLint config (v8) + ignore file so it won't lint build outputs
           'printf \'module.exports = { parser: "@typescript-eslint/parser", plugins: ["security"], extends: ["eslint:recommended", "plugin:security/recommended"], env: { node: true, es2021: true }, parserOptions: { ecmaVersion: 2021, sourceType: "module" } };\' > .eslintrc.cjs',
+          'printf "node_modules\\ncdk.out\\ndist\\n" > .eslintignore',
 
           // Trivy (binary)
           'curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b .',
@@ -75,13 +77,15 @@ export class TestPipelineStack extends cdk.Stack {
           'set -eu',
           'export PATH=$HOME/.local/bin:$PATH',
 
-          // Use CodeBuild-provided commit SHA; no .git in CodeBuild
+          // Use CodeBuild-provided commit SHA (no .git in CodeBuild)
           'REV=${CODEBUILD_RESOLVED_SOURCE_VERSION:-unknown}',
           'REPORT_PREFIX="test/${REV}-$(date +%Y%m%d%H%M%S)"',
           'mkdir -p reports',
 
           // --- SAST ---
           'echo "Running ESLint (security rules)..."',
+          // If you want to allow warnings but fail on errors, keep as-is;
+          // to make it "advisory", swap the next line to: `npx eslint . --ext .ts || echo "ESLint finished (non-blocking)"`
           'npx eslint . --ext .ts || (echo "ESLint security issues found" && exit 1)',
 
           'echo "Running Semgrep SAST..."',
@@ -90,7 +94,7 @@ export class TestPipelineStack extends cdk.Stack {
           // --- SCA ---
           'echo "Running npm audit (SCA)..."',
           'npm audit --json > reports/npm-audit.json || true',
-          // Fail only on High/Critical
+          // Fail only on High/Critical to avoid noise
           'node -e \'const r=require("./reports/npm-audit.json"); const a=(r.vulnerabilities||r.metadata?.vulnerabilities)||{}; const high=(a.high||0)+(a.HIGH||0); const critical=(a.critical||0)+(a.CRITICAL||0); if (high+critical>0){console.error("High/Critical vulns:",{high,critical}); process.exit(1);} else {console.log("npm audit: no High/Critical");}\'',
 
           // Build & synth
@@ -126,9 +130,12 @@ export class TestPipelineStack extends cdk.Stack {
     // --- DAST (OWASP ZAP Baseline) after deploy ---
     stage.addPost(
       new CodeBuildStep('DAST-ZAP-Baseline', {
-        buildEnvironment: { privileged: true }, // Docker needed for ZAP image
+        buildEnvironment: {
+          privileged: true,                                   // Docker for ZAP
+          computeType: codebuild.ComputeType.MEDIUM,          // ZAP is memory hungry; medium is safer
+        },
         envFromCfnOutputs: {
-          TARGET_URL: testStage.functionUrl, // Lambda Function URL (public in TEST)
+          TARGET_URL: testStage.functionUrl,                  // Lambda Function URL (public in TEST)
         },
         env: {
           REPORTS_BUCKET: reportsBucket.bucketName,
