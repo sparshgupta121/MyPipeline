@@ -1,8 +1,53 @@
-*.js
-!jest.config.js
-*.d.ts
-node_modules
-
 # CDK asset staging directory
 .cdk.staging
 cdk.out
+
+# Dependency directories
+node_modules/
+.npm/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Build output
+*.js
+*.d.ts
+!jest.config.js
+!.eslintrc.cjs
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+*.tmp
+*.temp
+
+# Package lock files (choose one based on your package manager)
+# Uncomment the one you DON'T use:
+# package-lock.json  # If using yarn
+# yarn.lock          # If using npm

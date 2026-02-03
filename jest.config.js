@@ -1,9 +1,20 @@
+/** @type {import('jest').Config} */
 module.exports = {
+  preset: 'ts-jest',
   testEnvironment: 'node',
-  roots: ['<rootDir>/test'],
-  testMatch: ['**/*.test.ts'],
+  // If your tests are under `test/` (CDK default), keep it; if it's `tests/`, change accordingly.
+  roots: ['<rootDir>/test', '<rootDir>/lib', '<rootDir>/bin'],
+  testMatch: ['**/?(*.)+(spec|test).ts'],
+  moduleFileExtensions: ['ts', 'js', 'json', 'node'],
   transform: {
-    '^.+\\.tsx?$': 'ts-jest'
+    '^.+\\.ts$': ['ts-jest', { tsconfig: 'tsconfig.json' }],
   },
-  setupFilesAfterEnv: ['aws-cdk-lib/testhelpers/jest-autoclean'],
+  collectCoverageFrom: [
+    'lib/**/*.ts',
+    'bin/**/*.ts',
+    '!lib/**/*.d.ts',
+    '!bin/**/*.d.ts',
+  ],
+  coverageDirectory: 'coverage',
+  coverageReporters: ['text', 'lcov', 'html'],
 };
