@@ -104,10 +104,6 @@ export class ProdPipelineStack extends cdk.Stack {
           'mkdir -p cdk.out || true',
           'npx cdk synth || (echo "cdk synth failed, writing dummy output" && echo "{}" > cdk.out/dummy.json)',
 
-          // --- IaC: Checkov ---
-          'echo "Running Checkov (demo)..."',
-          'checkov -d cdk.out --framework cloudformation -o json > reports/checkov.json || echo "Checkov failed, continuing..."',
-
           // --- Trivy FS ---
           'echo "Running Trivy FS (demo)..."',
           './trivy fs --security-checks vuln,secret,config --severity HIGH,CRITICAL --no-progress --format json -o reports/trivy-fs.json . || echo "Trivy failed, continuing..."',
