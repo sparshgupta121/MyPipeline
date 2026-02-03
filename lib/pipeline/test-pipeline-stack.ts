@@ -45,7 +45,7 @@ export class TestPipelineStack extends cdk.Stack {
               's3:PutObject',
               's3:AbortMultipartUpload',
               's3:ListBucket',
-              's3:PutObjectAcl'
+              's3:PutObjectAcl',
             ],
             resources: [reportsBucket.bucketArn, `${reportsBucket.bucketArn}/*`],
           }),
@@ -55,29 +55,45 @@ export class TestPipelineStack extends cdk.Stack {
           'python3 -m pip install --user --upgrade pip',
           'python3 -m pip install --user semgrep checkov',
           'export PATH=$HOME/.local/bin:$PATH',
+
+          // Node deps
           'npm ci',
-          'npm install --no-save -D eslint eslint-plugin-security @typescript-eslint/parser',
+
+          // Install CDK CLI locally so `npx cdk` is reliable in CodeBuild
+          'npm install --no-save aws-cdk@2',
+
+          // 🔒 Pin ESLint v8 to avoid v9 flat-config requirement
+          'npm install --no-save -D eslint@8.57.0 eslint-plugin-security@1.7.1 @typescript-eslint/parser@6.21.0',
+
+          // Write a minimal .eslintrc.cjs for ESLint v8
+          'printf \'module.exports = { parser: "@typescript-eslint/parser", plugins: ["security"], extends: ["eslint:recommended", "plugin:security/recommended"], env: { node: true, es2021: true }, parserOptions: { ecmaVersion: 2021, sourceType: "module" } };\' > .eslintrc.cjs',
+
+          // Trivy (binary)
           'curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b .',
         ],
         commands: [
-          'set -euo pipefail',
+          'set -eu',
           'export PATH=$HOME/.local/bin:$PATH',
-          'REV=$(git rev-parse --short HEAD || echo "unknown")',
+
+          // Use CodeBuild-provided commit SHA; no .git in CodeBuild
+          'REV=${CODEBUILD_RESOLVED_SOURCE_VERSION:-unknown}',
           'REPORT_PREFIX="test/${REV}-$(date +%Y%m%d%H%M%S)"',
           'mkdir -p reports',
 
           // --- SAST ---
           'echo "Running ESLint (security rules)..."',
           'npx eslint . --ext .ts || (echo "ESLint security issues found" && exit 1)',
+
           'echo "Running Semgrep SAST..."',
           'semgrep --config=auto --error --exclude node_modules --timeout=0 --json . > reports/semgrep.json',
 
           // --- SCA ---
           'echo "Running npm audit (SCA)..."',
           'npm audit --json > reports/npm-audit.json || true',
-          'node -e \'const r=require("./reports/npm-audit.json"); const a=(r.vulnerabilities||r.metadata?.vulnerabilities)||{}; const high=(a.high||0)+(a.HIGH||0); const critical=(a.critical||0)+(a.CRITICAL||0); if (high+critical>0){console.error("High/Critical vulns:",{high,critical}); process.exit(1);} else {console.log("npm audit: no High/Critical");}\'' ,
+          // Fail only on High/Critical
+          'node -e \'const r=require("./reports/npm-audit.json"); const a=(r.vulnerabilities||r.metadata?.vulnerabilities)||{}; const high=(a.high||0)+(a.HIGH||0); const critical=(a.critical||0)+(a.CRITICAL||0); if (high+critical>0){console.error("High/Critical vulns:",{high,critical}); process.exit(1);} else {console.log("npm audit: no High/Critical");}\'',
 
-          // Build + synth
+          // Build & synth
           'echo "Building & Synthesizing CDK..."',
           'npm run build',
           'npx cdk synth',
@@ -107,12 +123,12 @@ export class TestPipelineStack extends cdk.Stack {
 
     const stage = pipeline.addStage(testStage);
 
-    // DAST (unchanged; CodeBuildStep supports policies if/when needed)
+    // --- DAST (OWASP ZAP Baseline) after deploy ---
     stage.addPost(
       new CodeBuildStep('DAST-ZAP-Baseline', {
-        buildEnvironment: { privileged: true },
+        buildEnvironment: { privileged: true }, // Docker needed for ZAP image
         envFromCfnOutputs: {
-          TARGET_URL: testStage.functionUrl,
+          TARGET_URL: testStage.functionUrl, // Lambda Function URL (public in TEST)
         },
         env: {
           REPORTS_BUCKET: reportsBucket.bucketName,
@@ -123,13 +139,13 @@ export class TestPipelineStack extends cdk.Stack {
               's3:PutObject',
               's3:AbortMultipartUpload',
               's3:ListBucket',
-              's3:PutObjectAcl'
+              's3:PutObjectAcl',
             ],
             resources: [reportsBucket.bucketArn, `${reportsBucket.bucketArn}/*`],
           }),
         ],
         commands: [
-          'set -euo pipefail',
+          'set -eu',
           'REV=${CODEBUILD_RESOLVED_SOURCE_VERSION:-unknown}',
           'REPORT_PREFIX="test-dast/${REV}-$(date +%Y%m%d%H%M%S)"',
           'echo "Target URL: $TARGET_URL"',
@@ -143,6 +159,8 @@ export class TestPipelineStack extends cdk.Stack {
             '-m 5 -d',
 
           'aws s3 cp zap "s3://$REPORTS_BUCKET/$REPORT_PREFIX/" --recursive',
+
+          // Fail on Medium/High findings
           'if grep -qi \'"risk":"High"\' zap/zap-report.json || grep -qi \'"risk":"Medium"\' zap/zap-report.json; then ' +
             'echo "DAST found Medium/High alerts. Failing." && exit 1; else echo "DAST clean."; fi',
         ],
