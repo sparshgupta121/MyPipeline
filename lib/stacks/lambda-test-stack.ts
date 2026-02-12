@@ -22,7 +22,7 @@ export class LambdaTestStack extends cdk.Stack {
               'X-Frame-Options': 'DENY',
               'X-XSS-Protection': '1; mode=block'
             },
-            body: \`<html><head><title>Demo</title></head><body><h1>Hello, \${name}</h1></body></html>\`,
+            body: \`<html><head><title>Demo</title></head><body><h1>Hello,Team \${name}</h1></body></html>\`,
           };
         };
       `),
